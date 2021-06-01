@@ -1,0 +1,415 @@
+format_version: '2'
+name: DD Satelite ver01
+versions:
+  api: '1.0'
+  backend: 1.7.279
+  commit: 1e07622763d149970fd8808a8f12ff3b1e84e0d7
+  content: unknown
+  content_pack_name: unknown
+  format: '2'
+  frontend: 1.7.279
+  packs_version_avr8: 1.0.1401
+  packs_version_qtouch: unknown
+  packs_version_sam: 1.0.1373
+  version_backend: 1.7.279
+  version_frontend: ''
+board:
+  identifier: CustomBoard
+  device: ATmega328PB-MU
+details: null
+application: null
+middlewares: {}
+drivers:
+  CPU:
+    user_label: CPU
+    definition: 'Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::CPU::driver_config_definition::SYSCTRL::Drivers:SYSCTRL:'
+    functionality: System
+    api: 'Drivers:SYSCTRL:'
+    configuration:
+      async_input_speed: 32768
+      clkadc_oscillator: Input clock
+      clkasy_oscillator: Async input clock
+      clkcpu_oscillator: Input clock
+      clkio_oscillator: Input clock
+      clkptc_oscillator: Input clock
+      cpu_clock_source: CLKcpu
+      cpu_sreg_i: true
+      enable_async_input: false
+      enable_clkadc: false
+      enable_clkasy: false
+      enable_clkcpu: true
+      enable_clkio: true
+      enable_clkptc: false
+      enable_core_clock: true
+      enable_input: true
+      input_speed: 14745000
+      pm_ivsel: Interrupt vector placed at the beginning of main FLASH memory
+      pm_pud: false
+      pm_se: false
+      pm_sm: Idle
+      prescaler_divider: '1'
+    optional_signals: []
+    variant: null
+    clocks:
+      domain_group:
+        nodes:
+        - name: Core
+          input: Core
+          external: false
+          external_frequency: 0
+        configuration: {}
+  FLASH_0:
+    user_label: FLASH_0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::EEPROM::driver_config_definition::NVMCTRL.Basic::Drivers:NVMCTRL:Basic
+    functionality: Flash
+    api: Drivers:NVMCTRL:Basic
+    configuration:
+      blbset: false
+      eempe: false
+      eepe: false
+      eepm0: false
+      eepm1: false
+      eere: false
+      eerie: false
+      nvmctrl_irq_driven: false
+      nvmctrl_relocate_flash_functions: false
+      pgers: false
+      pgwrt: false
+      rwwsb: false
+      rwwsre: false
+      sigrd: false
+      spmen: false
+      spmie: false
+    optional_signals: []
+    variant: null
+    clocks:
+      domain_group: null
+  WDT_0:
+    user_label: WDT_0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::WDT::driver_config_definition::WDT::Drivers:WDT:Init
+    functionality: WDT
+    api: Drivers:WDT:Init
+    configuration:
+      inc_isr_harness: false
+      wdtcsr_wde: true
+      wdtcsr_wdie: false
+      wdtcsr_wdp: Oscillator Cycles 256K
+    optional_signals: []
+    variant: null
+    clocks:
+      domain_group: null
+  EXTERNAL_IRQ_0:
+    user_label: EXTERNAL_IRQ_0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::EXINT::driver_config_definition::EXINT::Drivers:EXINT:Init
+    functionality: External_IRQ
+    api: Drivers:EXINT:Init
+    configuration:
+      exint_isc0: The falling edge of ISC0 generates an interrupt request
+      exint_isc1: The falling edge of ISC1 generates an interrupt request
+      inc_isr_harness: true
+    optional_signals:
+    - identifier: EXTERNAL_IRQ_0:INT/0
+      pad: PD2
+      mode: Enabled
+      configuration: null
+      definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::optional_signal_definition::EXINT.INT.0
+      name: EXINT/INT/0
+      label: INT/0
+    variant: null
+    clocks:
+      domain_group: null
+  SPI_0:
+    user_label: SPI_0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::SPI0::driver_config_definition::SPI.Master.Polled::Drivers:SPI:Basic
+    functionality: SPI
+    api: Drivers:SPI:Basic
+    configuration:
+      spi_cpha: Sample on leading edge
+      spi_cpol: SCK is low when idle
+      spi_dord: MSB transmitted first
+      spi_mstr: Master mode
+      spi_open_close: false
+      spi_spe: true
+      spi_spie: false
+      spi_spr: fosc/64
+    optional_signals: []
+    variant:
+      specification: MASTER=1
+      required_signals:
+      - name: SPI0/MISO
+        pad: PB4
+        label: MISO
+      - name: SPI0/MOSI
+        pad: PB3
+        label: MOSI
+      - name: SPI0/SCK
+        pad: PB5
+        label: SCK
+    clocks:
+      domain_group:
+        nodes:
+        - name: SPI
+          input: CLKio
+          external: false
+          external_frequency: 0
+        configuration:
+          spi_clock_source: CLKio
+  PWM_0:
+    user_label: PWM_0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::TC1::driver_config_definition::TC16.Mode.1.Phase.Correct.8-bit.PWM::Drivers:PWM:Basic
+    functionality: PWM
+    api: Drivers:PWM:Basic
+    configuration:
+      callback_rate: 0
+      inc_overflow_irq: true
+      pwm_top: '0xff'
+      tc16_coma: Clear OCA on up-counting, set OCA on down-counting
+      tc16_comb: Normal port operation, OCB disconnected
+      tc16_cs: No prescaling
+      tc16_ices: Falling edge will trigger input capture
+      tc16_icie: false
+      tc16_icnc: false
+      tc16_icr: 0
+      tc16_ociea: false
+      tc16_ocieb: false
+      tc16_orca: 0
+      tc16_orcb: 0
+      tc16_toie: true
+    optional_signals:
+    - identifier: PWM_0:OCA
+      pad: PB1
+      mode: Enabled
+      configuration: null
+      definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::optional_signal_definition::TC1.OCA
+      name: TC1/OCA
+      label: OCA
+    variant: null
+    clocks:
+      domain_group:
+        nodes:
+        - name: TC16
+          input: CLKio
+          external: false
+          external_frequency: 0
+        configuration:
+          tc16_clock_source: CLKio
+  TIMER_0:
+    user_label: TIMER_0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::TC3::driver_config_definition::TC16.Mode.4.CTC::Drivers:TC16:Init
+    functionality: Timer
+    api: Drivers:TC16:Init
+    configuration:
+      inc_isr_harness: true
+      tc16_coma: Normal port operation, OCA disconnected
+      tc16_comb: Normal port operation, OCB disconnected
+      tc16_cs: IO clock divided by 1024
+      tc16_ices: Falling edge will trigger input capture
+      tc16_icie: false
+      tc16_icnc: false
+      tc16_icr: 0
+      tc16_ociea: true
+      tc16_ocieb: false
+      tc16_orca: 144
+      tc16_orcb: 0
+      tc16_psrasy: false
+      tc16_psrsync: false
+      tc16_toie: false
+      tc16_tsm: false
+    optional_signals: []
+    variant: null
+    clocks:
+      domain_group:
+        nodes:
+        - name: TC16
+          input: CLKio
+          external: false
+          external_frequency: 0
+        configuration:
+          tc16_clock_source: CLKio
+  USART_0:
+    user_label: USART_0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::USART0::driver_config_definition::Async.IRQ.Mode::Drivers:USART:Basic
+    functionality: USART
+    api: Drivers:USART:Basic
+    configuration:
+      driver_rx_buffer_size: '64'
+      driver_tx_buffer_size: '64'
+      printf_support: false
+      usart_baud_rate: 38400
+      usart_mpcm: false
+      usart_rxcie: true
+      usart_rxen: true
+      usart_rxsie: false
+      usart_sfde: false
+      usart_txcie: false
+      usart_txen: true
+      usart_ucpha: Sample data on the first edge of XCK
+      usart_ucpol: false
+      usart_ucsz: 8-bit
+      usart_udord: LSB is transmitted first
+      usart_udrie: false
+      usart_upm: Disabled
+      usart_usbs: 1-bit
+    optional_signals: []
+    variant:
+      specification: UMSEL=0
+      required_signals:
+      - name: USART0/RXD
+        pad: PD0
+        label: RXD
+      - name: USART0/TXD
+        pad: PD1
+        label: TXD
+    clocks:
+      domain_group:
+        nodes:
+        - name: USART
+          input: CLKio
+          external: false
+          external_frequency: 0
+        configuration:
+          usart_clock_source: CLKio
+pads:
+  _SENSOR_B:
+    name: PD3
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PD3
+    mode: Digital input
+    user_label: _SENSOR_B
+    configuration: null
+  RS485_DIR:
+    name: PD4
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PD4
+    mode: Digital output
+    user_label: RS485_DIR
+    configuration: null
+  HW_ID_0:
+    name: PE0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PE0
+    mode: Digital input
+    user_label: HW_ID_0
+    configuration:
+      pad_pull_config: Pull-up
+  HW_ID_1:
+    name: PE1
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PE1
+    mode: Digital input
+    user_label: HW_ID_1
+    configuration:
+      pad_pull_config: Pull-up
+  LED_GREEN:
+    name: PD5
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PD5
+    mode: Digital output
+    user_label: LED_GREEN
+    configuration: null
+  LED_RED:
+    name: PD6
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PD6
+    mode: Digital output
+    user_label: LED_RED
+    configuration: null
+  N_RFID_STR:
+    name: PB0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PB0
+    mode: Digital output
+    user_label: N_RFID_STR
+    configuration: null
+  PB1:
+    name: PB1
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PB1
+    mode: Digital output
+    user_label: PB1
+    configuration: null
+  RFID_CS:
+    name: PB2
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PB2
+    mode: Digital output
+    user_label: RFID_CS
+    configuration: null
+  PB3:
+    name: PB3
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PB3
+    mode: Digital output
+    user_label: PB3
+    configuration: null
+  PB4:
+    name: PB4
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PB4
+    mode: Digital input
+    user_label: PB4
+    configuration: null
+  PB5:
+    name: PB5
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PB5
+    mode: Digital output
+    user_label: PB5
+    configuration: null
+  HW_ID_2:
+    name: PE2
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PE2
+    mode: Digital input
+    user_label: HW_ID_2
+    configuration:
+      pad_pull_config: Pull-up
+  EXT_LED_HW04:
+    name: PE3
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PE3
+    mode: Digital output
+    user_label: EXT_LED_HW04
+    configuration: null
+  EXT_LED_HW02:
+    name: PC1
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PC1
+    mode: Digital output
+    user_label: EXT_LED_HW02
+    configuration: null
+  ADR0:
+    name: PC2
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PC2
+    mode: Digital input
+    user_label: ADR0
+    configuration: null
+  ADR1:
+    name: PC3
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PC3
+    mode: Digital input
+    user_label: ADR1
+    configuration: null
+  ADR2:
+    name: PC4
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PC4
+    mode: Digital input
+    user_label: ADR2
+    configuration: null
+  ADR3:
+    name: PC5
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PC5
+    mode: Digital input
+    user_label: ADR3
+    configuration: null
+  PD0:
+    name: PD0
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PD0
+    mode: Digital input
+    user_label: PD0
+    configuration: null
+  PD1:
+    name: PD1
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PD1
+    mode: Digital output
+    user_label: PD1
+    configuration: null
+  _SENSOR_A:
+    name: PD2
+    definition: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::pad::PD2
+    mode: Digital input
+    user_label: _SENSOR_A
+    configuration: null
+toolchain_options:
+- definition:
+    identifier: Atmel:ATMega328PB_drivers:1.0.0::ATmega328PB-MU::environment_definition::All:Atmel.Studio:7.0.0
+  configuration:
+    compiler_config:
+      avrgcc_compiler_miscellaneous_OtherFlags: -std=gnu99
+    linker_config:
+      avrgcc_linker_miscellaneous_LinkerFlags: ''

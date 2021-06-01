@@ -1,0 +1,11 @@
+
+*.d
+*.o
+*.hex
+Release/makedep.mk
+Release/Makefile
+Release/Satellite.eep
+Release/Satellite.elf
+Release/Satellite.lss
+Release/Satellite.map
+Release/Satellite.srec
