@@ -55,12 +55,12 @@ void main_SetBlueBlink(unsigned char ucNoOfBlink)
 
 
 
-static unsigned char ucTimerTic_10ms = 0;
+//static unsigned char ucTimerTic_10ms = 0;
 
 void main_inc_ucTimerTic_10ms(void)
 {
-	ucTimerTic_10ms++;
-	if (!ucTimerTic_10ms) ucTimerTic_10ms--;
+	timer_Control();
+
 }
 
 
@@ -70,7 +70,6 @@ int main(void)
 {
 	volatile bool flicker = false;
 	unsigned char connectionEstablished = 0;
-	unsigned int pendingLEDCounter = 0;
 	int direction = 1;
 	/* Initializes MCU, drivers and middleware */
 	atmel_start_init();
@@ -78,40 +77,21 @@ int main(void)
 	LED_init();
 	RFID_Init();
 	
-//#ifndef RELEASE
-	LED_setColor(0x00,0x00,0x0A); // Signal "initialized and ready"
-	//timer_SetTime(STIMER_WAITING_FOR_CONNECT, 10); //this should be a 1s timeout.
-//#endif
+	LED_setColor(0x00,0x00,0x21); // Signal "initialized and ready"
+	timer_SetTime(FTIMER_COLORSHIFT,3); 
 	Address_get_tHWVersion();
-	// used for testing solenoid 
-	//solenoid_InitiateRelease(100, 5, 12, 3);
 	while (1)
 	{
-		if (ucTimerTic_10ms)
-		{
-			ucTimerTic_10ms--;
-			timer_Control();
-		}
+
 		connectionEstablished = serial_Service();
 		solenoid_Service();
 		RFID_service();
 		//providing color shift to show end note is functional prior to connection (can also be used as part of factory test verification)
 		if (connectionEstablished == 0){
-			if(pendingLEDCounter++ > 3000){
+			if(!timer_bRunning(FTIMER_COLORSHIFT)){
 				unsigned char ucRed, ucGreen, ucBlue;
 				LED_getColor(&ucRed, &ucGreen, &ucBlue);
-				/*
-				if (ucBlue > 0){
-					LED_setColor(0x0A,0,0);
-				}
-				else if (ucRed > 0){
-					LED_setColor(0,0x0A,0);
-				}
-				else{
-					LED_setColor(0,0,0x0A);
-				}
-				*/
-				if (ucBlue > 0x0A){
+				if (ucBlue > 0x21){
 					direction = -1;
 				}
 				else if (ucBlue == 0){
@@ -119,17 +99,14 @@ int main(void)
 				}
 				ucBlue += direction;
 				LED_setColor(0,0,ucBlue);	
-				pendingLEDCounter = 0;
-				
-			}
-			
-			//timer_SetTime(STIMER_WAITING_FOR_CONNECT, 10); //this should be a 1s timeout.
+				timer_SetTime(FTIMER_COLORSHIFT,3); 
+			}		
+
 		}
-	//wdt_reset();
-//__asm__ __volatile__ ("wdr");
-//#warning WD DISABLED!!!
 	flicker = !flicker;
-	EXT_LED_HW02_set_level(flicker);
+	EXT_LED_HW02_set_level(flicker); // toggle pin so we can see how much time main loop is taking by oscope
+	wdt_reset(); //watchdog reset moved to main loop (where it should be!)
+
 	}
 }
 

@@ -39,6 +39,9 @@
 #include <usart_basic.h>
 #include <atomic.h>
 
+volatile uint8_t dataOverrunDetected;
+volatile uint8_t receiveBufferOverflowDetected;
+
 /* Static Variables holding the ringbuffer used in IRQ mode */
 static uint8_t          USART_0_rxbuf[USART_0_RX_BUFFER_SIZE];
 static volatile uint8_t USART_0_rx_head;
@@ -58,14 +61,17 @@ void USART_0_default_rx_isr_cb(void)
 {
 	uint8_t data;
 	uint8_t tmphead;
-
+	
 	/* Read the received data */
 	data = UDR0;
+	//
+	dataOverrunDetected  = (dataOverrunDetected | ( UCSR0A & ( (1<<FE0)|(1<<DOR0)|(1<<UPE0) ) ) ); //persist errors
 	/* Calculate buffer index */
 	tmphead = (USART_0_rx_head + 1) & USART_0_RX_BUFFER_MASK;
 
 	if (tmphead == USART_0_rx_tail) {
 		/* ERROR! Receive buffer overflow */
+		receiveBufferOverflowDetected = 1;
 	} else {
 		/* Store new index */
 		USART_0_rx_head = tmphead;
@@ -276,6 +282,9 @@ int8_t USART_0_init()
 	USART_0_tx_tail     = x;
 	USART_0_tx_head     = x;
 	USART_0_tx_elements = x;
+	//init overrun detection to 0 (DOR)
+	dataOverrunDetected = 0;
+	receiveBufferOverflowDetected = 0;
 
 	return 0;
 }
@@ -336,4 +345,14 @@ void USART_0_disable()
 uint8_t USART_0_get_data()
 {
 	return UDR0;
+}
+
+uint8_t get_DORvar()
+{
+	return dataOverrunDetected;	
+}
+
+uint8_t get_receiveBufferOverflowDetected()
+{
+	return receiveBufferOverflowDetected;
 }

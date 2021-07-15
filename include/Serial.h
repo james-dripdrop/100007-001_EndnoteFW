@@ -39,7 +39,7 @@ typedef enum {IDLE, TO_ADDR, FROM_ADDR, TELEGRAM_TYPE, LENGTH, DATA, CHKSUM_HI, 
 /***************************************************************************/
 
 
-#define SW_VERSION 17
+#define SW_VERSION 18
 #define RELEASE
 #ifndef RELEASE
 #warning This Version is for internal use only

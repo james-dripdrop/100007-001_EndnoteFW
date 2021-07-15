@@ -76,7 +76,7 @@ void mfrc630_read_fifo(uint8_t* rx, uint16_t len) {
   mfrc630_SPI_select();
     mfrc630_SPI_transfer(read_instruction, discard, 1);
     uint16_t i;
-    for (i=0; i < (len - 1) ; i++) {
+    for (i=1; i < len ; i++) {
       mfrc630_SPI_transfer(read_instruction, rx++, 1);
     }
     mfrc630_SPI_transfer(read_finish, rx++, 1);
@@ -196,11 +196,11 @@ void mfrc630_timer_set_control(uint8_t timer, uint8_t value) {
 }
 void mfrc630_timer_set_reload(uint8_t timer, uint16_t value) {
   mfrc630_write_reg(MFRC630_REG_T0RELOADHI + (5 * timer), value >> 8);
-  mfrc630_write_reg(MFRC630_REG_T0RELOADLO + (5 * timer), 0xFF);
+  mfrc630_write_reg(MFRC630_REG_T0RELOADLO + (5 * timer), value & 0xFF);
 }
 void mfrc630_timer_set_value(uint8_t timer, uint16_t value) {
   mfrc630_write_reg(MFRC630_REG_T0COUNTERVALHI + (5 * timer), value >> 8);
-  mfrc630_write_reg(MFRC630_REG_T0COUNTERVALLO + (5 * timer), 0xFF);
+  mfrc630_write_reg(MFRC630_REG_T0COUNTERVALLO + (5 * timer), value & 0xFF);
 }
 uint16_t mfrc630_timer_get_value(uint8_t timer) {
   uint16_t res = mfrc630_read_reg(MFRC630_REG_T0COUNTERVALHI + (5 * timer)) << 8;
@@ -494,7 +494,7 @@ uint8_t mfrc630_iso14443a_select(uint8_t* uid, uint8_t* sak) {
       uint8_t collision_pos = 0;
       if (irq0 & MFRC630_IRQ0_ERR_IRQ) {  // some error occured.
 		// JGU: this abort of error handling is required (it actually takes too long to resolve)
-		return NFC_COLLISION_DETECTED;
+		//return NFC_COLLISION_DETECTED;
         // Check what kind of error.
         // error = mfrc630_read_reg(MFRC630_REG_ERROR);
         if (error & MFRC630_ERROR_COLLDET) {
@@ -662,7 +662,7 @@ uint8_t mfrc630_iso14443a_select(uint8_t* uid, uint8_t* sak) {
       for (UIDn=0; UIDn < 4; UIDn++) {
         uid[(cascade_level-1)*3 + UIDn] = uid_this_level[UIDn];
       }
-
+	  *sak = sak_value;
       // Finally, return the length of the UID that's now at the uid pointer.
       return cascade_level*3 + 1;
     }

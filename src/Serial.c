@@ -112,6 +112,13 @@ uint16_t uiCatchReturnedID = 0;
 uint16_t uiCatchReleasedID = 0;
 uint8_t decay_return = 0;
 uint8_t decay_release = 0;
+uint16_t status_msg_received = 0;
+uint8_t release_msg_received = 0;
+uint8_t crcErrors = 0;
+uint8_t errorDOR = 0;
+uint8_t errorBFLOW = 0;
+uint16_t discardedBytes = 0;
+
 /***************************************************************************/
 /*                                                                         */
 /* Implementation                                                          */
@@ -135,13 +142,15 @@ void SendArray(unsigned char *ucData, unsigned char ucNoOfData)
 	volatile unsigned char ucDataCnt = 0;
 	unsigned int uiCRC = 0;
 	
-	/* Test for error in number of data - Stay here to force WD reset */ 
-	if (ucNoOfData == 0){}
-	if (ucNoOfData > USART_0_TX_BUFFER_SIZE - 4){}
-	
 	uiCRC = crc_16(ucData, (size_t)ucNoOfData);
-	volatile uint32_t uicnt=300;while(uicnt--){}; // Hard-coded Delay - with internal osc. (8MHz) there's 1150µs from master has finished transmitting until satellite sets 485 direction to TX
-	RS485_DIR_set_level(RS485TX); // Set direction to "send" - returned to "listen" in service, when tx buffer has been emptied.
+	
+	if (RS485_DIR_get_level() !=  RS485TX){
+				//we need to swap the port direction
+				//give some variability by address to assist in preventing bus conflict
+		volatile uint16_t decon_delay = SATELLITE_ADDRESS*2;
+		while(decon_delay--){}
+		RS485_DIR_set_level(RS485TX);
+	}
 
 	USART_0_write(STX);
 	while (ucDataCnt < ucNoOfData)
@@ -151,10 +160,7 @@ void SendArray(unsigned char *ucData, unsigned char ucNoOfData)
 	USART_0_write((unsigned char)(uiCRC >> 8)); // hi byte
 	USART_0_write((unsigned char)uiCRC);		// lo byte
 	USART_0_write(ETX);
-	
-	// Reset the Watchdog here - every time we reply to a telegram from the master
-	// So reset will occur, if master stops talking to us, or if we get lost in code, so that we can't answer.
-	wdt_reset();
+
 }
 
 
@@ -198,34 +204,42 @@ UmbrellaStatus_t get_tUmbrellaStatus(void)
 
 void decode_telegram(ToSatelliteTelegram_t tTelegramType, bool bBroadcast, uint8_t ucDatacount)
 {
+	//static bool changeToTXInProgress=false;
+	ToMasterTelegram_t outTelegramType = TO_MASTER_NO_TLG;
 	switch (tTelegramType)
 	{
 		case TO_SATELLITE_TLG_LED:
 			LED_setColor(ucReceivedData[RED_LED_POS], ucReceivedData[GREEN_LED_POS], ucReceivedData[BLUE_LED_POS]);
 			if (!bBroadcast) 
 			{
-				serial_Send(TO_MASTER_TLG_LED);
+				outTelegramType = TO_MASTER_TLG_LED;
 			}
 			break;
 		case TO_SATELLITE_TLG_RELEASE:
+			release_msg_received+=1;
 			solenoid_InitiateRelease(ucReceivedData[0], ucReceivedData[1], ucReceivedData[2], ucReceivedData[3]);
-			serial_Send(TO_MASTER_TLG_RELEASE);
+			outTelegramType = TO_MASTER_TLG_RELEASE;
 			break;
 		case TO_SATELLITE_TLG_VERSION:
-			serial_Send(TO_MASTER_TLG_VERSION);
+			outTelegramType =TO_MASTER_TLG_VERSION;
 			break;
 		case TO_SATELLITE_TLG_STATUS:
-				serial_Send(TO_MASTER_TLG_END_NODE_STATUS);
+			status_msg_received+=1;
+			outTelegramType = TO_MASTER_TLG_END_NODE_STATUS;
 			break;
 		case TO_SATELLITE_TLG_RESET:
 			LED_setColor(0,0,0x0A);
 			while (true) {};
 			break;
 		default:
-			// Just lay down here and wait to die
-			// currently ignore error and continue
+			// currently ignore error and continue (non-critical fault)
 			break;
 	}
+	if (outTelegramType != TO_MASTER_NO_TLG){
+		// we have a message to send out, so flip the direction of the RS485 line 
+		serial_Send(outTelegramType);	
+	}
+	
 }
 
 /***************************************************************************/
@@ -282,10 +296,13 @@ void serial_Send(ToMasterTelegram_t tTelegram)
 		case TO_MASTER_TLG_END_NODE_STATUS:
 		{
 			// stx|0x10|From_addr| 0x85 | 0x05 | Status | ID3(MSB) | ID2 | ID1 | ID0(LSB) |crc_h|crc_l|etx
+			// modified to send statistics!!
 			ucData[ucDataCnt++] = MASTER_ADDRESS;
 			ucData[ucDataCnt++] = SATELLITE_ADDRESS;
 			ucData[ucDataCnt++] = TO_MASTER_TLG_END_NODE_STATUS;
-			ucData[ucDataCnt++] = 0x05;
+			//ucData[ucDataCnt++] = 0x05; 
+			ucData[ucDataCnt++] = 0x0D; 
+			
 			uint32_t ulUmbrellaID = 0;
 			unsigned char ucEndNodeStatus = 0;
 			{
@@ -301,6 +318,18 @@ void serial_Send(ToMasterTelegram_t tTelegram)
 			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 2));
 			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 1));
 			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 0)); //LSB
+			//adding statistics here
+			ucData[ucDataCnt++] = (uint8_t)(status_msg_received>>8); //upper byte
+			ucData[ucDataCnt++] = (uint8_t)(status_msg_received); //lower byte			
+			ucData[ucDataCnt++] = release_msg_received;
+			
+			ucData[ucDataCnt++] = errorBFLOW;
+			ucData[ucDataCnt++] = errorDOR;
+			ucData[ucDataCnt++] = crcErrors;
+			ucData[ucDataCnt++]= (uint8_t)(discardedBytes>>8);
+			ucData[ucDataCnt++]= (uint8_t)(discardedBytes);
+			
+			
 			break;
 		}
 		default:
@@ -329,11 +358,17 @@ unsigned char serial_Service(void)
 	
 	unsigned char ucReceivedChar;
 	
-	if (USART_0_is_tx_empty() && !USART_0_is_tx_busy()) RS485_DIR_set_level(RS485RX); // when last data has been sent and buffer is empty - Set direction to "listen"
+	if (USART_0_is_tx_empty()){
+		  // when last data has been sent and buffer is empty - Set direction to "listen" 
+		 RS485_DIR_set_level(RS485RX);
+	}
+	
 	
 	// parse incoming data
 	while (USART_0_is_rx_ready())
 	{
+		errorDOR = errorDOR | get_DORvar(); //persist errors (framing, data overflow, parity)
+		errorBFLOW = errorBFLOW | get_receiveBufferOverflowDetected(); //persist bufferoverflowerror
 		hasConnected = 1;
 		ucReceivedChar = (unsigned char)USART_0_read();
 		switch (ucSstate)
@@ -345,8 +380,10 @@ unsigned char serial_Service(void)
 					ucCRC16DataCnt = 0;
 					ucSstate = TO_ADDR;
                 }
-				else
+				else{
 					ucSstate = IDLE;
+					discardedBytes += 1;
+				}
 				break;
 			case TO_ADDR:
 				ucDataForCRC16[ucCRC16DataCnt++] = ucReceivedChar;
@@ -361,6 +398,8 @@ unsigned char serial_Service(void)
 	            else
 				{
 					ucSstate = IDLE;
+					discardedBytes += 1;
+
 				}
 			    break;
 			case FROM_ADDR:
@@ -372,6 +411,8 @@ unsigned char serial_Service(void)
 	            else
 				{
 					ucSstate = IDLE;
+					discardedBytes += 1;
+
 				}
 			    break;
 			case TELEGRAM_TYPE:
@@ -384,14 +425,18 @@ unsigned char serial_Service(void)
 				else
 				{
 					ucSstate = IDLE;
+					discardedBytes += 1;
+
 				}
 			    break;
 			case LENGTH:
 				ucDataForCRC16[ucCRC16DataCnt++] = ucReceivedChar;
 				ucDataFieldLength = ucReceivedChar;
 				unNoOfReceivedData = 0;
-				if (ucDataFieldLength > TLG_DATA_FIELD_MAX_LENGTH) // limit data length
+				if (ucDataFieldLength > TLG_DATA_FIELD_MAX_LENGTH){ // limit data length
 					ucSstate = IDLE;
+					discardedBytes += 1;
+				}
 				else if (ucDataFieldLength == 0)
 					ucSstate = CHKSUM_HI;
 				else
@@ -429,7 +474,10 @@ unsigned char serial_Service(void)
 					}
 					else
 					{
-						//do nothing on CRC error
+						crcErrors += 1;
+						discardedBytes += (5+3+ucCRC16DataCnt);
+
+						//do nothing on CRC error,return to idle
 					}
 				}
                 ucSstate = IDLE; // get ready for next time
@@ -441,22 +489,7 @@ unsigned char serial_Service(void)
 	{
 		ucSstate = IDLE;
 	}
-	
-	// Catch ID's	
-	/*
-	if (uiCatchReturnedID > 0)
-	{
-		ulReturnedID = RFID_get_ulUmbrellaID();
-		if (ulReturnedID > 0) uiCatchReturnedID  = 0; // valid ID seen
-		else uiCatchReturnedID--;
-	}
-	if (uiCatchReleasedID > 0)
-	{
-		ulReleasedID = RFID_get_ulUmbrellaID();
-		if (ulReleasedID > 0) uiCatchReleasedID  = 0; // valid ID seen
-		else uiCatchReleasedID--;
-	}
-	*/
+
 	return hasConnected;
 }
 
@@ -467,16 +500,13 @@ void serial_UmbrellaReturned(void)
 {
 	bUmbrellaReturned = true;
 	decay_return=0;
-	//ulReturnedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
-	//if (ulReturnedID == 0) uiCatchReturnedID = ATTEMPTS_TO_CATCH_ID;
+
 }
 
 void serial_UmbrellaReleased(void)
 {
 	bUmbrellaRemoved = true;
 	decay_release = 0;
-	//ulReleasedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
-	//if (ulReleasedID == 0) uiCatchReleasedID = ATTEMPTS_TO_CATCH_ID;
 }
 
 void serial_UmbrellaReleaseTimout(void)

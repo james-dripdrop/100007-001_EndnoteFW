@@ -57,7 +57,6 @@
 #define MFRC63002_SILICON	0x18
 #define MFRC63003_SILICON	0x1A
 
-#define FTIMER_RFID_READ_INTERVAL_ms_x10 10
 
 #define DECAY_COUNTS 30  //this is the hold delay for the RFID tag
 /***************************************************************************/
@@ -125,16 +124,7 @@ void RFID_Init()
 	mfrc630_SPI_unselect();  // Atmel.start driver does NOT ensure this! --> was initiated to false in Start!
 	
 // 	ucRFIDReaderSiliconID = mfrc630_read_reg(0x7F);
-	//JGU: EMI_EMC: when the RFID reader is supplied with 5V, we fail compliance at 4th and ?16th? harmonics; modifying txAmp alows the transmit voltage to be reduced.
-	// per MFRC630 spec, bits 7-6 control voltage offset, while 4-0 control residual carrier percentage. bit 5 is not set.
-	// this requires CWMax (bit 3) in TxCon register (0h2A) to not be set (otherwise TxAmp has no influence). TxCon is currently NOT modified by this software
-	// and therefore CWMax is assumed to be 0 (this is fairly straightforward to test and verify)
-	// the residual carrier percentage is described in table 22 (8.6.2), with a note noting that modulation behavior may not match for voltages less than 5V and carrier % less than 50%.
-	// 0x00 | 0x18 should give a -100mV reduction with 60% residual carrier + 25% modulation index 
-	// 0xC0 |0x18 should give a -1V reduction with 60% residual carrier and 25% modulation index
-	//we are going to read the TxCon register, and make sure the CWMax bit is set to to 0.
 
-	 //end EMI_EMC compliance modification.
 	 
 	// Set the registers of the MFRC630 into the default.
 	mfrc630_AN1102_recommended_registers(MFRC630_PROTO_ISO14443A_106_MILLER_MANCHESTER);
@@ -185,7 +175,9 @@ void RFID_Read(void)
 		ucID[n] = 0;
 	}
 	*/
-	cli();
+	
+	// jgu: getting rid of interrupt clear; this is supposedly not necessary for function.
+	//cli();
 	uint16_t atqa = mfrc630_iso14443a_REQA();
 	if (atqa != 0)   // Are there any cards that answered?
 	{
@@ -246,8 +238,8 @@ void RFID_Read(void)
 		//hold time for tag has expired, set recorded tag to 0
 		memset((void *)ucID, 0x00, UMBRELLA_ID_LENGTH_bytes);
 	}
-
-	sei();
+	// jgu: getting rid of interrupt clear; this is supposedly not necessary for function.
+	//sei();
 	bReading = false;
 }
 

@@ -10,8 +10,8 @@
 /****************************************************************************************************************/
 
 
-#define FTIMER_RFID_READ_INTERVAL_ms_x10 10
 
+#define FTIMER_RFID_READ_INTERVAL_ms_x10 10
 
 
 #define TIMER_STOPPED 0xFFFF
@@ -24,6 +24,8 @@ enum { // 10ms Timers
 		FTIMER_SENSOR_ANTI_PRELL,
 		TIMER_StorageTask,
 		FTIMER_RFID_READ,
+		FTIMER_COLORSHIFT,
+		FTIMER_SERIAL_CHANGE_TO_XMIT,
        FTIMER_MAX,
        // 100ms Timers
        MTIMER_START,
