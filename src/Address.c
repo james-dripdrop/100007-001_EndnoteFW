@@ -73,19 +73,10 @@
 unsigned char Address_ucRead(void)
 {
 	unsigned char ucUnitAddress;
-	
 	ucUnitAddress = (unsigned char)ADR0_get_level(); 
 	ucUnitAddress |= (unsigned char)(ADR1_get_level()) << 1;
 	ucUnitAddress |= (unsigned char)(ADR2_get_level()) << 2;
 	ucUnitAddress |= (unsigned char)(ADR3_get_level()) << 3;
-	
-	//due to prototype having switch flipped, addresses should be coming from different pins (2 3 0 1)
-	/*
-	ucUnitAddress = (unsigned char)ADR1_get_level();
-	ucUnitAddress |= (unsigned char)(ADR0_get_level()) << 1;
-	ucUnitAddress |= (unsigned char)(ADR3_get_level()) << 2;
-	ucUnitAddress |= (unsigned char)(ADR2_get_level()) << 3;
-	*/
 	return ucUnitAddress;
 }
 

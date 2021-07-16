@@ -39,6 +39,7 @@ typedef enum {
 	HW_VERSION_01	= 0x01, // First End_Note PCB
 	HW_VERSION_02	= 0x02, // Second End_Note PCB - Improved ESD behavior - No CPU related changes
 	HW_VERSION_03	= 0x03, // Elongated version, includes fuses.
+	HW_VERSION_04   = 0x04, //release, marked as v4.1
 } T_HWVersion;
 
 /***************************************************************************/

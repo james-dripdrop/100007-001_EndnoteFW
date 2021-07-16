@@ -58,7 +58,7 @@
 #define MFRC63003_SILICON	0x1A
 
 
-#define DECAY_COUNTS 30  //this is the hold delay for the RFID tag
+#define RFID_DECAY_TIMEOUT_IN_100MS 10  //this is the hold delay for the RFID tag
 /***************************************************************************/
 /*                                                                         */
 /* Locals                                                                  */
@@ -66,12 +66,8 @@
 /***************************************************************************/
 
 volatile unsigned char ucID[UMBRELLA_ID_LENGTH_bytes] = {0}; 
-volatile uint8_t decay_count = 0; 
 unsigned char ucRFIDReaderSiliconID;
 
-// allow timer interrupt to reinitialize RFID reader if it takes to long
-uint8_t ucReadNumber = 0;
-bool bReading = false;
 
 
 /***************************************************************************/
@@ -136,48 +132,15 @@ void RFID_Init()
 	//drvconreg = mfrc630_read_reg(MFRC630_REG_DRVCON);
 	//txampreg = mfrc630_read_reg(MFRC630_REG_TXAMP);
 	timer_SetTime(FTIMER_RFID_READ, FTIMER_RFID_READ_INTERVAL_ms_x10);
-	ucReadNumber = 0;
-	bReading = false;
 }
 
 
-// call every 10ms to make sure RFID reader does not get stuck
-void RFID_TestProgress(void)
-{
-	static uint8_t ucLastReadNumber = 0;
-	static uint8_t ucAttempts = 0;
-	if (bReading && (ucReadNumber == ucLastReadNumber)) ucAttempts++;
-	else ucAttempts = 0;
-	ucLastReadNumber = ucReadNumber;
-	if (ucAttempts >= 3)
-	{
-		cli();
-		RFID_Init();
-		sei();
-		ucLastReadNumber = 0;
-		ucAttempts = 0;
-	}
-}
 
 
 
 void RFID_Read(void)
 {
-	bReading = true;
-	ucReadNumber++;
-	timer_SetTime(FTIMER_RFID_READ, FTIMER_RFID_READ_INTERVAL_ms_x10);
-	//keep the last UID in some circumstances; only reset
-	
-	// Start by clearing the old ID
-	/* unsigned char n;
-	for (n=0; n<UMBRELLA_ID_LENGTH_bytes; n++)
-	{
-		ucID[n] = 0;
-	}
-	*/
-	
-	// jgu: getting rid of interrupt clear; this is supposedly not necessary for function.
-	//cli();
+	timer_SetTime(FTIMER_RFID_READ, FTIMER_RFID_READ_INTERVAL_ms_x10); // since the timer is cleared in an interrupt, make sure to set timer each time we enter
 	uint16_t atqa = mfrc630_iso14443a_REQA();
 	if (atqa != 0)   // Are there any cards that answered?
 	{
@@ -197,11 +160,8 @@ void RFID_Read(void)
 				memcpy((void *)ucID, (const void *)uid, UMBRELLA_ID_LENGTH_bytes);
 			}
 			//and reset the decay count				
-			decay_count = 0;
+			timer_SetTime(MTIMER_RFID_DECAY,RFID_DECAY_TIMEOUT_IN_100MS);
 		}
-
-		//length didn't match for a valid umbrella
-		//don't count it as a read, and decrement the decay
 		
 	
 		{ // Authenticate begin - Necessary to ensure stable operation
@@ -219,11 +179,6 @@ void RFID_Read(void)
 				{
 					len = mfrc630_MF_read_block(b, readbuf);
 					len = len;  //avoid not-used warning
-//					Serial.print("Read block 0x");
-//					print_block(&len,1);
-//					Serial.print(": ");
-//					print_block(readbuf, len);
-//					Serial.println();
 				}
 				mfrc630_MF_deauth();  // be sure to call this after an authentication!
 			} 
@@ -233,14 +188,12 @@ void RFID_Read(void)
 			}
 		} // Authenticate end
 	} //end any cards that answered
-	decay_count += 1;
-	if (decay_count >= DECAY_COUNTS){
+
+	if ( !timer_bRunning(MTIMER_RFID_DECAY)  ){
 		//hold time for tag has expired, set recorded tag to 0
 		memset((void *)ucID, 0x00, UMBRELLA_ID_LENGTH_bytes);
 	}
-	// jgu: getting rid of interrupt clear; this is supposedly not necessary for function.
-	//sei();
-	bReading = false;
+
 }
 
 
@@ -254,7 +207,6 @@ void RFID_service(void)
 {
 	if (!timer_bRunning(FTIMER_RFID_READ))
 	{
-		timer_SetTime(FTIMER_RFID_READ, FTIMER_RFID_READ_INTERVAL_ms_x10);
 		RFID_Read();
 	}
 }

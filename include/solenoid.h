@@ -2,7 +2,7 @@
   Copyright (c) 2019 by FAVetronics. All rights reserved.
 
   Project:      Michanik, DripDrop Satellite
-  Filename:		solenoide.h
+  Filename:		solenoid.h
   Created by:   Niels Falk Vedel
 
   Description:
@@ -11,8 +11,8 @@
 
 */
 
-#ifndef _COMPILE_SOLENOIDE_H
-#define _COMPILE_SOLENOIDE_H
+#ifndef _COMPILE_SOLENOID_H
+#define _COMPILE_SOLENOID_H
 
 
 /***************************************************************************/
@@ -60,7 +60,11 @@ void solenoid_InitiateRelease(unsigned char ucPWM_high_pct, unsigned char uctime
 
 unsigned char solenoid_get_ucReleaseStatus(void);
 
-void solenoid_DetectMove(void);
+void wheel_DetectMove(void);
+
+void deactivateSolenoid(void);
+
+void handleSolenoidPulsing(void);
 
 
 #endif /* _COMPILE_ADDRESS_H */

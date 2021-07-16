@@ -2,6 +2,8 @@
   Bunches of definitions for the WS2812 Breakout Board example code
   
 */ 
+#ifndef WS2812_DEFS_H
+#define WS2812_DEFS_H
 
 // These are for the cascade function
 #define TOP_DOWN 0
@@ -152,3 +154,6 @@
 #define LIGHTYELLOW		0xFFFFE0
 #define IVORY			0xFFFFF0
 #define WHITE			0xFFFFFF
+
+#endif
+

@@ -2,7 +2,7 @@
   Copyright (c) 2019 by FAVetronics. All rights reserved.
 
   Project:      Michanik, DripDrop Satellite
-  Filename:     solenoide.C
+  Filename:     solenoid.C
   Created by:   Niels Falk Vedel
 
   Description:  
@@ -23,7 +23,7 @@
 #include "RFID.h"
 #include "solenoid.h"
 #include "Mug_up.h"
-#include "Umbrella.h"
+
 
 /***************************************************************************/
 /*                                                                         */
@@ -79,38 +79,50 @@ uint8_t ucInrushPulses = -1;
 /*                                                                         */
 /***************************************************************************/
 
+
+
 void solenoid_Service(void)
 {
-	if (bSolenoidActivated)
+	if(bSolenoidActivated)
 	{
-		if ((!timer_bRunning(MTIMER_SOLENOID_TIMEOUT)) && bReleaseTimeoutEnabled)
+		if( ( !timer_bRunning(MTIMER_SOLENOID_TIMEOUT) ) && bReleaseTimeoutEnabled)
 		{
-			PWM_0_load_duty_cycle_ch0(0); // disable solenoid
-			bSolenoidActivated = false;
+			deactivateSolenoid();
 			serial_UmbrellaReleaseTimout();
 		}
-		else if (!timer_bRunning(MTIMER_SOLENOID_INRUSH)) // inrush complete
+		else if (!timer_bRunning(MTIMER_SOLENOID_INRUSH))
 		{
-			if (ucInrushPulses < (NO_OF_INRUSH_PULSES * 2))
-			{
-				if (ucInrushPulses++ & 0x01) // inrush was activated (uneven)
-				{
-					PWM_0_load_duty_cycle_ch0((PWM_0_register_t)ucPWMHoldLevel_bin); // set hold PWM
-				}
-				else // activate inrush again
-				{
-					PWM_0_load_duty_cycle_ch0((PWM_0_register_t)ucPWMInrushLevel_bin); //Set inrush PWM
-				}
-				timer_SetTime(MTIMER_SOLENOID_INRUSH, ucInrushTime_ms_x100); // restart timer
-			}
-			else PWM_0_load_duty_cycle_ch0((PWM_0_register_t)ucPWMHoldLevel_bin); // inrush complete
+				handleSolenoidPulsing();
 		}
 	}
-	else 
+	else
 	{
-		PWM_0_load_duty_cycle_ch0(0); // Make sure output really is off
+		
+
+		deactivateSolenoid();//apparently, we want to make sure the solenoid is off...which is concerning.
 	}
 }
+
+void handleSolenoidPulsing(void)
+{
+	if (ucInrushPulses < (NO_OF_INRUSH_PULSES * 2))
+	{
+		if (ucInrushPulses++ & 0x01) // inrush was activated (uneven)
+		{
+			PWM_0_load_duty_cycle_ch0((PWM_0_register_t)ucPWMHoldLevel_bin); // set hold PWM
+		}
+		else // activate inrush again
+		{
+			PWM_0_load_duty_cycle_ch0((PWM_0_register_t)ucPWMInrushLevel_bin); //Set inrush PWM
+		}
+		timer_SetTime(MTIMER_SOLENOID_INRUSH, ucInrushTime_ms_x100); // restart timer
+	}
+	else
+	{
+		PWM_0_load_duty_cycle_ch0((PWM_0_register_t)ucPWMHoldLevel_bin); // inrush complete
+	}
+}
+
 
 
 
@@ -133,15 +145,18 @@ void solenoid_InitiateRelease(unsigned char ucPWM_high_pct, unsigned char uctime
 	}
 	else // Deactivate solenoid
 	{
-		timer_SetTime(MTIMER_SOLENOID_INRUSH, TIMER_STOPPED);
-		timer_SetTime(MTIMER_SOLENOID_TIMEOUT, TIMER_STOPPED);
-		PWM_0_load_duty_cycle_ch0(0); //Stop PWM
-		bSolenoidActivated = false;
-		bReleaseTimeoutEnabled = true;
+		deactivateSolenoid();
 	}
 }
 
-
+void deactivateSolenoid(void)
+{
+	TimerStop(MTIMER_SOLENOID_INRUSH);
+	TimerStop(MTIMER_SOLENOID_TIMEOUT);
+	PWM_0_load_duty_cycle_ch0(0); //Stop PWM
+	bSolenoidActivated = false;
+	bReleaseTimeoutEnabled = true;
+}
 
 
 
@@ -149,69 +164,78 @@ unsigned char solenoid_get_ucReleaseStatus(void)
 {
 	// 0x00: NOT releasing umbrella
 	// 0x01: Releasing umbrella
-	return (unsigned char)bSolenoidActivated;
+	// hold the status for a timer-based duration to prevent going from Releasing -> OK -> Umbrella Released
+	
+	return (unsigned char)(bSolenoidActivated || timer_bRunning(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT));
 }
 
 
-/*
-void _solenoid_DetectMove(void) // called by Sensor A falling edge interrupt
-{
-	if (_SENSOR_B_get_level())
-	{
-		// signal that umbrella has been returned
-		serial_UmbrellaReturned();
-	}
-	else if (bSolenoidActivated) // It's not possible to remove umbrella if solenoid is not activated
-	{
-		// signal that umbrella has been removed
-		serial_UmbrellaReleased();
-		if (bReleaseTimeoutEnabled)
-		{
-			PWM_0_load_duty_cycle_ch0(0); // disable solenoid
-			bSolenoidActivated = false;
-			timer_SetTime(MTIMER_SOLENOID_TIMEOUT, TIMER_STOPPED);
-		}
-	}
-	RFID_RequestIDRead();
-}
-*/
 
-void solenoid_DetectMove(void) // called by Sensor A any edge interrupt
+// called by Sensor A / Sensor B any edge interrupt
+void wheel_DetectMove(void) 
 {
 	static bool bReturnBegun = false;
 	static bool bRemoveBegun = false;
-
-	if (_SENSOR_A_get_level() == false)
+	volatile bool sensorALevel = _SENSOR_A_get_level();
+	volatile bool sensorBLevel = _SENSOR_B_get_level();
+	if(!timer_bRunning(MTIMER_SPIN_TIMEOUT))
 	{
-		if (_SENSOR_B_get_level())
-		{
-			bReturnBegun = true;
-		}
-		else if (bSolenoidActivated) // It's not possible to remove umbrella if solenoid is not activated
-		{
-			bRemoveBegun = true;
-		}
-		RFID_RequestIDRead(); //JGU: interrupt driven clearing of RFID read timer
-	}
-	else // A high
-	{
-		if (_SENSOR_B_get_level() && bRemoveBegun)
-		{
-			// signal that umbrella has been removed
-			serial_UmbrellaReleased();
-			if (bReleaseTimeoutEnabled)
-			{
-				PWM_0_load_duty_cycle_ch0(0); // disable solenoid
-				bSolenoidActivated = false;
-				timer_SetTime(MTIMER_SOLENOID_TIMEOUT, TIMER_STOPPED);
-			}
-		}
-		else if (bReturnBegun)
-		{
-			// signal that umbrella has been returned
-			serial_UmbrellaReturned();
-		}
+		//if timer isn't running, reset status
 		bReturnBegun = false;
 		bRemoveBegun = false;
 	}
+	
+	if(bReturnBegun)
+	{
+		//look for conditions that would establish a return wheelspin has occurred
+		if( ( sensorALevel ) )
+		{
+			//Experimentation with returning indicates on a return, sensor B can be in either state
+			/*
+			We need to:
+				indicate that the umbrella is returned
+				clear the spin timer ; this resets returnBegun/removeBegun on next edge
+			*/
+			serial_UmbrellaReturned();
+			TimerStop(MTIMER_SPIN_TIMEOUT);
+		}
+		
+	}
+	else if (bRemoveBegun)
+	{
+		//look for conditions that would establish a release wheelspin has occurred
+		if( ( sensorALevel ) && ( sensorBLevel ) )
+		{
+			/*
+			We need to:
+			communicate that the umbrella is released
+			lock the arm again (stop energizing the solenoid)
+			request the RFID read
+			clear the spin timer
+			*/
+			RFID_RequestIDRead(); //JGU: interrupt driven clearing of RFID read timer
+			serial_UmbrellaReleased();
+			TimerStop(MTIMER_SPIN_TIMEOUT);
+			// locking the arm probably should be in its own function			
+			deactivateSolenoid();
+		}
+	}
+	else
+	{
+		//the start of a return or release has not been registered, but some motion has triggered the edge interrupt
+		if(!sensorALevel)
+		{
+			timer_SetTime(MTIMER_SPIN_TIMEOUT,10); //timeout between starting a spin and ending a spin
+			if(!sensorBLevel)
+			{
+				bRemoveBegun = true; 
+			}
+			else 
+			{
+				RFID_RequestIDRead(); //JGU: interrupt driven clearing of RFID read timer
+				bReturnBegun = true; 
+			}
+		}
+	}
+	
 }

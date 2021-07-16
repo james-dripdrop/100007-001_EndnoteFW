@@ -23,8 +23,8 @@
 #include "LED.h"
 #include "solenoid.h"
 #include "RFID.h"
-#include "Umbrella.h"
-
+#include "Version.h"
+#include <avr/boot.h>
 /***************************************************************************/
 /*                                                                         */
 /* Types                                                                   */
@@ -46,8 +46,8 @@ typedef enum {
 	masterStatus_ReleasingUmbrella		= 0x02,
 	masterStatus_UmbrellaReleased		= 0x04,
 	masterStatus_UmbrellaNotReleased	= 0x08,
-//	masterStatus_Initializing			= 0x20, End-Node doesn't have this information
-//	masterStatus_NotInstalled			= 0x40,
+	masterStatus_Initializing			= 0x20, 
+	masterStatus_NotInstalled			= 0x40,
 	} masterStatus_t;
 
 
@@ -61,7 +61,7 @@ typedef enum {
 #define ETX 0x03
 
 #define TLG_PREAMBLE_LENGTH			5	// stx | To_addr | From_addr | type | count 
-#define TLG_DATA_FIELD_MAX_LENGTH	10	// Plenty of room for data content
+#define TLG_DATA_FIELD_MAX_LENGTH	16	// Plenty of room for data content
 #define TLG_EPILOG_LENGTH			3	// crc_h | crc_l | etx
 #define MAX_TELEGRAM_LENGTH (TLG_PREAMBLE_LENGTH + TLG_DATA_FIELD_MAX_LENGTH + TLG_EPILOG_LENGTH) 
 
@@ -79,6 +79,7 @@ typedef enum {
 #define RETURN_DECAY 30 // this is the wheelspin delay counter (before reporting) on return
 #define RELEASE_DECAY 30 // this is the wheelspin delay counter (before reporting) on release
 #define wdt_reset()	   __asm__ __volatile__ ("wdr")
+
 
 
 /***************************************************************************/
@@ -102,16 +103,14 @@ unsigned char unNoOfReceivedData;
 unsigned char ucReceivedData[MAX_TELEGRAM_LENGTH];
 
 bool bUmbrellaReturned = false;
+bool firstStatusMessageAfterBoot = true;
 unsigned char hasConnected = 0;
-uint32_t ulReturnedID = 0;
+volatile uint32_t ulUmbrellaID = 0;
 bool bUmbrellaRemoved = false;
-uint32_t ulReleasedID = 0;
 bool bUmbrellaReleaseTimeout = false;
 
 uint16_t uiCatchReturnedID = 0;
 uint16_t uiCatchReleasedID = 0;
-uint8_t decay_return = 0;
-uint8_t decay_release = 0;
 uint16_t status_msg_received = 0;
 uint8_t release_msg_received = 0;
 uint8_t crcErrors = 0;
@@ -172,25 +171,22 @@ UmbrellaStatus_t get_tUmbrellaStatus(void)
 	
 	if (bUmbrellaReturned)	
 	{
-		if (decay_return > RETURN_DECAY){
+		if(!timer_bRunning(MTIMER_STATUS_HOLD_RETURN_TIMEOUT))
+		{
 			tResult = UMBRELLA_RETURNED;
-			ulReturnedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
+			//ulReturnedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
 			bUmbrellaReturned = false;			
 		}
-		decay_return +=1;
 
 	}
 	else if (bUmbrellaRemoved)
 	{
-		if (decay_release > RELEASE_DECAY){
-					tResult = UMBRELLA_REMOVED;
-					ulReturnedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
-					bUmbrellaRemoved = false;
+		if(!timer_bRunning(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT))
+		{
+				tResult = UMBRELLA_REMOVED;
+				//ulReturnedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
+				bUmbrellaRemoved = false;
 		}
-		decay_release +=1;
-
-		//tResult = UMBRELLA_REMOVED;
-		//bUmbrellaRemoved = false;	
 	}
 	else if (bUmbrellaReleaseTimeout)
 	{
@@ -284,13 +280,24 @@ void serial_Send(ToMasterTelegram_t tTelegram)
 		}
 		case TO_MASTER_TLG_VERSION:
 		{
-			// stx | 0x10 | From_addr | 0x83 | 0x02 | SWvers | HWvers | crc_h | crc_l | etx
+			// stx | 0x10 | From_addr | 0x83 | 0x02 | SWvers | HWvers | SER#00 | ... | SER#09| crc_h | crc_l | etx
 			ucData[ucDataCnt++] = MASTER_ADDRESS;
 			ucData[ucDataCnt++] = SATELLITE_ADDRESS;
 			ucData[ucDataCnt++] = TO_MASTER_TLG_VERSION;
-			ucData[ucDataCnt++] = 0x02;
+			ucData[ucDataCnt++] = 0x0C;
 			ucData[ucDataCnt++] = SW_VERSION;
 			ucData[ucDataCnt++] = Address_get_tHWVersion();
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 0);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 1);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 2);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 3);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 4);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 5);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 6);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 7);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 8);
+			ucData[ucDataCnt++] = boot_signature_byte_get(0x0E + 9);
+			
 			break;
 		}
 		case TO_MASTER_TLG_END_NODE_STATUS:
@@ -303,17 +310,34 @@ void serial_Send(ToMasterTelegram_t tTelegram)
 			//ucData[ucDataCnt++] = 0x05; 
 			ucData[ucDataCnt++] = 0x0D; 
 			
-			uint32_t ulUmbrellaID = 0;
 			unsigned char ucEndNodeStatus = 0;
-			{
-				UmbrellaStatus_t tUmbrellaStatus = get_tUmbrellaStatus();
-				if (tUmbrellaStatus == UMBRELLA_RETURNED)						{ucEndNodeStatus |= masterStatus_UmbrellaReturned; ulUmbrellaID = ulReturnedID;}
-				if (solenoid_get_ucReleaseStatus())								ucEndNodeStatus |= masterStatus_ReleasingUmbrella;
-				if (tUmbrellaStatus == UMBRELLA_REMOVED)						{ucEndNodeStatus |= masterStatus_UmbrellaReleased; ulUmbrellaID = ulReleasedID;}
-				if (tUmbrellaStatus == UMBRELLA_RELEASE_TIMEOUT)				ucEndNodeStatus |= masterStatus_UmbrellaNotReleased;
+			
+			UmbrellaStatus_t tUmbrellaStatus = get_tUmbrellaStatus();
+			if (tUmbrellaStatus == UMBRELLA_RETURNED){
+				ucEndNodeStatus |= masterStatus_UmbrellaReturned;
+				//ulUmbrellaID = ulReturnedID;
 			}
+			if ( solenoid_get_ucReleaseStatus() ){
+				ucEndNodeStatus |= masterStatus_ReleasingUmbrella;
+			}
+			if (tUmbrellaStatus == UMBRELLA_REMOVED){
+				ucEndNodeStatus |= masterStatus_UmbrellaReleased; 
+				//ulUmbrellaID = ulReleasedID;
+			}							
+			if (tUmbrellaStatus == UMBRELLA_RELEASE_TIMEOUT){
+				ucEndNodeStatus |= masterStatus_UmbrellaNotReleased;
+			}	
+			if (firstStatusMessageAfterBoot){
+				ucEndNodeStatus |= masterStatus_Initializing;
+				firstStatusMessageAfterBoot = false;
+			}
+			
 			ucData[ucDataCnt++] = ucEndNodeStatus;
-			if (ulUmbrellaID == 0) ulUmbrellaID = RFID_get_ulUmbrellaID(); // get current ID
+			
+			
+			ulUmbrellaID = RFID_get_ulUmbrellaID(); // get umbrella ID
+			
+			
 			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 3)); //MSB
 			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 2));
 			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 1));
@@ -464,20 +488,11 @@ unsigned char serial_Service(void)
 					{
 						// Act on received
 						decode_telegram(tReceivedTelegramType, bBroadcast, ucDataFieldLength);
-						//r13: sequenced RFID read - started on first valid telegram
-						static bool bFirstValidTelegram = true;
-						if (bFirstValidTelegram)
-						{
-							bFirstValidTelegram = false;
-							timer_SetTime(FTIMER_RFID_READ, FTIMER_RFID_READ_INTERVAL_ms_x10);
-						}
 					}
 					else
 					{
 						crcErrors += 1;
 						discardedBytes += (5+3+ucCRC16DataCnt);
-
-						//do nothing on CRC error,return to idle
 					}
 				}
                 ucSstate = IDLE; // get ready for next time
@@ -499,14 +514,17 @@ unsigned char serial_Service(void)
 void serial_UmbrellaReturned(void)
 {
 	bUmbrellaReturned = true;
-	decay_return=0;
+	TimerStop(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT);
+	timer_SetTime(MTIMER_STATUS_HOLD_RETURN_TIMEOUT,3); //set status hold for 300ms
+
 
 }
 
 void serial_UmbrellaReleased(void)
 {
 	bUmbrellaRemoved = true;
-	decay_release = 0;
+	TimerStop(MTIMER_STATUS_HOLD_RETURN_TIMEOUT);
+	timer_SetTime(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT,3); //set status hold for 300ms
 }
 
 void serial_UmbrellaReleaseTimout(void)

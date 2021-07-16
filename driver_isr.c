@@ -42,9 +42,15 @@ ISR(INT0_vect)
 {
 
 	/* Insert your EXINT/INT/0 interrupt handling code here */
-	solenoid_DetectMove();
+	wheel_DetectMove();
 }
 
+ISR(INT1_vect)
+{
+
+	/* Insert your EXINT/INT/1 interrupt handling code here */
+	wheel_DetectMove();
+}
 
 //Prototype from main
 void main_inc_ucTimerTic_10ms(void);

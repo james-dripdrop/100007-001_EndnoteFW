@@ -8,7 +8,8 @@
 /*                                                                                                              */
 /*  Changes :                                                                                                   */
 /****************************************************************************************************************/
-
+#ifndef TIMER_H
+#define TIMER_H
 
 
 #define FTIMER_RFID_READ_INTERVAL_ms_x10 10
@@ -34,6 +35,11 @@ enum { // 10ms Timers
 		MTIMER_RED_BLINK,
 		MTIMER_GREEN_BLINK,
 		MTIMER_BLUE_BLINK,
+		MTIMER_SPIN_TIMEOUT,
+		MTIMER_STATUS_HOLD_RELEASE_TIMEOUT,
+		MTIMER_STATUS_HOLD_RETURN_TIMEOUT,
+		MTIMER_RFID_DECAY,
+		
        MTIMER_MAX,
        // 1 sec. Timers
        STIMER_START,
@@ -57,3 +63,4 @@ unsigned int timer_uiTimeLeft_sec(unsigned char TimerNr); // returns remaining t
 void timer_Control(void);									// General control routine - MUST be called every 10ms 
 unsigned int TimerGetTick_x10ms(void);
 
+#endif

@@ -20,40 +20,6 @@ FUSES =
 };
 
 
-#include "Mug_up.h"
-#ifdef MUG_UP_TEST
-#include "Address.h"
-#include "NeoPixel.h"
-
-unsigned char ucRedBlinksLeft = 3;
-unsigned char ucGreenBlinksLeft = 3;
-unsigned char ucBlueBlinksLeft = 3;
-
-void main_SetRedBlink(unsigned char ucNoOfBlink)
-{
-	ucRedBlinksLeft += ucNoOfBlink;
-}
-void main_SetGreenBlink(unsigned char ucNoOfBlink)
-{
-	ucGreenBlinksLeft += ucNoOfBlink;
-}
-void main_SetBlueBlink(unsigned char ucNoOfBlink)
-{
-	ucBlueBlinksLeft += ucNoOfBlink;
-}
-
-#define LED_ON_TIME_ms_x100		2
-#define LED_OFF_TIME_ms_x100	(LED_ON_TIME_ms_x100 * 3)
-#define GREEN_LED_ON_VALUE		100
-#define GREEN_LED_OFF_VALUE		0
-#define RED_LED_ON_VALUE		100
-#define RED_LED_OFF_VALUE		0
-#define BLUE_LED_ON_VALUE		100
-#define BLUE_LED_OFF_VALUE		5
-
-#endif
-
-
 
 //static unsigned char ucTimerTic_10ms = 0;
 
@@ -73,16 +39,15 @@ int main(void)
 	int direction = 1;
 	/* Initializes MCU, drivers and middleware */
 	atmel_start_init();
-	/* Replace with your application code */
+
 	LED_init();
 	RFID_Init();
 	
 	LED_setColor(0x00,0x00,0x21); // Signal "initialized and ready"
 	timer_SetTime(FTIMER_COLORSHIFT,3); 
-	Address_get_tHWVersion();
+
 	while (1)
 	{
-
 		connectionEstablished = serial_Service();
 		solenoid_Service();
 		RFID_service();
@@ -101,12 +66,10 @@ int main(void)
 				LED_setColor(0,0,ucBlue);	
 				timer_SetTime(FTIMER_COLORSHIFT,3); 
 			}		
-
 		}
 	flicker = !flicker;
 	EXT_LED_HW02_set_level(flicker); // toggle pin so we can see how much time main loop is taking by oscope
 	wdt_reset(); //watchdog reset moved to main loop (where it should be!)
-
 	}
 }
 
