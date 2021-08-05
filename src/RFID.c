@@ -58,7 +58,7 @@
 #define MFRC63003_SILICON	0x1A
 
 
-#define RFID_DECAY_TIMEOUT_IN_100MS 10  //this is the hold delay for the RFID tag
+#define RFID_DECAY_TIMEOUT_IN_100MS 15  //this is the hold delay for the RFID tag; a successful release or return status response can clear the hold early
 /***************************************************************************/
 /*                                                                         */
 /* Locals                                                                  */
@@ -217,6 +217,7 @@ void RFID_service(void)
 /************************************************************************/
 uint32_t RFID_get_ulUmbrellaID(void)
 {
+	
 	return(	(uint32_t)ucID[0] << (8*3) |
 			(uint32_t)ucID[1] << (8*2) |
 			(uint32_t)ucID[2] << (8*1) |

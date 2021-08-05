@@ -64,8 +64,10 @@ bool USART_0_is_rx_ready();
 bool USART_0_is_tx_busy();
 
 uint8_t get_DORvar();
+void clear_DORvar();
 
 uint8_t get_receiveBufferOverflowDetected();
+void clear_receiveBufferOverflowDetected();
 
 
 /************************************************************************/

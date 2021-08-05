@@ -25,6 +25,7 @@
 #include "RFID.h"
 #include "Version.h"
 #include <avr/boot.h>
+#include <string.h>
 /***************************************************************************/
 /*                                                                         */
 /* Types                                                                   */
@@ -61,9 +62,11 @@ typedef enum {
 #define ETX 0x03
 
 #define TLG_PREAMBLE_LENGTH			5	// stx | To_addr | From_addr | type | count 
-#define TLG_DATA_FIELD_MAX_LENGTH	16	// Plenty of room for data content
+#define TLG_DATA_FIELD_MAX_LENGTH	16	// Allocated for data content
 #define TLG_EPILOG_LENGTH			3	// crc_h | crc_l | etx
 #define MAX_TELEGRAM_LENGTH (TLG_PREAMBLE_LENGTH + TLG_DATA_FIELD_MAX_LENGTH + TLG_EPILOG_LENGTH) 
+
+#define STATUS_TLG_DATA_LENGTH		0x0D // data size for status message
 
 #define RS485TX true
 #define RS485RX !RS485TX
@@ -101,6 +104,7 @@ typedef enum {
 /***************************************************************************/
 unsigned char unNoOfReceivedData;
 unsigned char ucReceivedData[MAX_TELEGRAM_LENGTH];
+unsigned char dataHeldUntilConfirmed[STATUS_TLG_DATA_LENGTH] = {0};
 
 bool bUmbrellaReturned = false;
 bool firstStatusMessageAfterBoot = true;
@@ -108,6 +112,7 @@ unsigned char hasConnected = 0;
 volatile uint32_t ulUmbrellaID = 0;
 bool bUmbrellaRemoved = false;
 bool bUmbrellaReleaseTimeout = false;
+bool statusConfirmationReceived = true; //default to true will send the first response
 
 uint16_t uiCatchReturnedID = 0;
 uint16_t uiCatchReleasedID = 0;
@@ -146,7 +151,7 @@ void SendArray(unsigned char *ucData, unsigned char ucNoOfData)
 	if (RS485_DIR_get_level() !=  RS485TX){
 				//we need to swap the port direction
 				//give some variability by address to assist in preventing bus conflict
-		volatile uint16_t decon_delay = SATELLITE_ADDRESS*2;
+		volatile uint16_t decon_delay = SATELLITE_ADDRESS*5; //in the range of 0x30-0x3F * 5
 		while(decon_delay--){}
 		RS485_DIR_set_level(RS485TX);
 	}
@@ -175,6 +180,7 @@ UmbrellaStatus_t get_tUmbrellaStatus(void)
 		{
 			tResult = UMBRELLA_RETURNED;
 			//ulReturnedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
+			TimerStop(MTIMER_RFID_DECAY); // clear the RFID decay timer : if we are here, we are responding to a status request after the hold time.
 			bUmbrellaReturned = false;			
 		}
 
@@ -185,6 +191,7 @@ UmbrellaStatus_t get_tUmbrellaStatus(void)
 		{
 				tResult = UMBRELLA_REMOVED;
 				//ulReturnedID = RFID_get_ulUmbrellaID(); // log ID matching this incident
+				TimerStop(MTIMER_RFID_DECAY); // clear the RFID decay timer : if we are here, we are responding to a status request after the hold time.
 				bUmbrellaRemoved = false;
 		}
 	}
@@ -221,6 +228,9 @@ void decode_telegram(ToSatelliteTelegram_t tTelegramType, bool bBroadcast, uint8
 			break;
 		case TO_SATELLITE_TLG_STATUS:
 			status_msg_received+=1;
+			if(ucReceivedData[0] == dataHeldUntilConfirmed[0]){
+				statusConfirmationReceived = true;
+			}
 			outTelegramType = TO_MASTER_TLG_END_NODE_STATUS;
 			break;
 		case TO_SATELLITE_TLG_RESET:
@@ -251,7 +261,6 @@ void serial_Send(ToMasterTelegram_t tTelegram)
 {
 	unsigned char ucData[USART_0_TX_BUFFER_SIZE];
 	unsigned char ucDataCnt = 0;
-	
 	switch (tTelegram)
 	{
 		case TO_MASTER_TLG_LED:
@@ -302,56 +311,75 @@ void serial_Send(ToMasterTelegram_t tTelegram)
 		}
 		case TO_MASTER_TLG_END_NODE_STATUS:
 		{
-			// stx|0x10|From_addr| 0x85 | 0x05 | Status | ID3(MSB) | ID2 | ID1 | ID0(LSB) |crc_h|crc_l|etx
 			// modified to send statistics!!
 			ucData[ucDataCnt++] = MASTER_ADDRESS;
 			ucData[ucDataCnt++] = SATELLITE_ADDRESS;
 			ucData[ucDataCnt++] = TO_MASTER_TLG_END_NODE_STATUS;
-			//ucData[ucDataCnt++] = 0x05; 
-			ucData[ucDataCnt++] = 0x0D; 
+			ucData[ucDataCnt++] = STATUS_TLG_DATA_LENGTH; 
+			if (statusConfirmationReceived)
+			{
+				//the master will echo the last received status in order to help capture lost frames
+				//
+				unsigned char ucEndNodeStatus = 0;
 			
-			unsigned char ucEndNodeStatus = 0;
+				UmbrellaStatus_t tUmbrellaStatus = get_tUmbrellaStatus();
+				if (tUmbrellaStatus == UMBRELLA_RETURNED){
+					ucEndNodeStatus |= masterStatus_UmbrellaReturned;
+					//ulUmbrellaID = ulReturnedID;
+				}
+				if ( solenoid_get_ucReleaseStatus() ){
+					ucEndNodeStatus |= masterStatus_ReleasingUmbrella;
+				}
+				if (tUmbrellaStatus == UMBRELLA_REMOVED){
+					ucEndNodeStatus |= masterStatus_UmbrellaReleased;
+					//ulUmbrellaID = ulReleasedID;
+				}
+				if (tUmbrellaStatus == UMBRELLA_RELEASE_TIMEOUT){
+					ucEndNodeStatus |= masterStatus_UmbrellaNotReleased;
+				}
+				if (firstStatusMessageAfterBoot){
+					ucEndNodeStatus |= masterStatus_Initializing;
+					firstStatusMessageAfterBoot = false;
+				}
 			
-			UmbrellaStatus_t tUmbrellaStatus = get_tUmbrellaStatus();
-			if (tUmbrellaStatus == UMBRELLA_RETURNED){
-				ucEndNodeStatus |= masterStatus_UmbrellaReturned;
-				//ulUmbrellaID = ulReturnedID;
+				ucData[ucDataCnt++] = ucEndNodeStatus;
+			
+			
+				ulUmbrellaID = RFID_get_ulUmbrellaID(); // get umbrella ID
+				ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 3)); //MSB
+				ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 2));
+				ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 1));
+				ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 0)); //LSB
+				//adding statistics here
+				ucData[ucDataCnt++] = (uint8_t)(status_msg_received>>8); //upper byte
+				ucData[ucDataCnt++] = (uint8_t)(status_msg_received); //lower byte
+				ucData[ucDataCnt++] = release_msg_received;
+							
+				ucData[ucDataCnt++] = errorBFLOW;
+				ucData[ucDataCnt++] = errorDOR;
+				ucData[ucDataCnt++] = crcErrors;
+				ucData[ucDataCnt++]= (uint8_t)(discardedBytes>>8);
+				ucData[ucDataCnt++]= (uint8_t)(discardedBytes);
+				
+				//clear the persistent errors
+				errorBFLOW = 0;
+				errorDOR = 0;
+				clear_DORvar();
+				clear_receiveBufferOverflowDetected();
+
+				
+				//store the data
+				memcpy(dataHeldUntilConfirmed,&ucData[ucDataCnt-STATUS_TLG_DATA_LENGTH],STATUS_TLG_DATA_LENGTH);
+				statusConfirmationReceived=false;
 			}
-			if ( solenoid_get_ucReleaseStatus() ){
-				ucEndNodeStatus |= masterStatus_ReleasingUmbrella;
+			else
+			{
+				//we need to resend the previous status and umbrellaID
+				memcpy(&ucData[ucDataCnt],dataHeldUntilConfirmed, STATUS_TLG_DATA_LENGTH);
+				ucDataCnt=STATUS_TLG_DATA_LENGTH+TLG_PREAMBLE_LENGTH -1; //do not count STX
 			}
-			if (tUmbrellaStatus == UMBRELLA_REMOVED){
-				ucEndNodeStatus |= masterStatus_UmbrellaReleased; 
-				//ulUmbrellaID = ulReleasedID;
-			}							
-			if (tUmbrellaStatus == UMBRELLA_RELEASE_TIMEOUT){
-				ucEndNodeStatus |= masterStatus_UmbrellaNotReleased;
-			}	
-			if (firstStatusMessageAfterBoot){
-				ucEndNodeStatus |= masterStatus_Initializing;
-				firstStatusMessageAfterBoot = false;
-			}
+
 			
-			ucData[ucDataCnt++] = ucEndNodeStatus;
-			
-			
-			ulUmbrellaID = RFID_get_ulUmbrellaID(); // get umbrella ID
-			
-			
-			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 3)); //MSB
-			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 2));
-			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 1));
-			ucData[ucDataCnt++] = (unsigned char)(ulUmbrellaID >> (8 * 0)); //LSB
-			//adding statistics here
-			ucData[ucDataCnt++] = (uint8_t)(status_msg_received>>8); //upper byte
-			ucData[ucDataCnt++] = (uint8_t)(status_msg_received); //lower byte			
-			ucData[ucDataCnt++] = release_msg_received;
-			
-			ucData[ucDataCnt++] = errorBFLOW;
-			ucData[ucDataCnt++] = errorDOR;
-			ucData[ucDataCnt++] = crcErrors;
-			ucData[ucDataCnt++]= (uint8_t)(discardedBytes>>8);
-			ucData[ucDataCnt++]= (uint8_t)(discardedBytes);
 			
 			
 			break;
@@ -515,7 +543,7 @@ void serial_UmbrellaReturned(void)
 {
 	bUmbrellaReturned = true;
 	TimerStop(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT);
-	timer_SetTime(MTIMER_STATUS_HOLD_RETURN_TIMEOUT,3); //set status hold for 300ms
+	timer_SetTime(MTIMER_STATUS_HOLD_RETURN_TIMEOUT,3); //set status hold for 300ms; the intent is to delay reporting a return by this time to allow an RFID to be captured.
 
 
 }
@@ -524,7 +552,7 @@ void serial_UmbrellaReleased(void)
 {
 	bUmbrellaRemoved = true;
 	TimerStop(MTIMER_STATUS_HOLD_RETURN_TIMEOUT);
-	timer_SetTime(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT,3); //set status hold for 300ms
+	timer_SetTime(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT,3); //set status hold for 300ms; the intent is to delay reporting a release by this time to allow an RFID to be captured.
 }
 
 void serial_UmbrellaReleaseTimout(void)

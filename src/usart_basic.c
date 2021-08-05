@@ -352,7 +352,18 @@ uint8_t get_DORvar()
 	return dataOverrunDetected;	
 }
 
+void clear_DORvar()
+{
+	dataOverrunDetected=0;
+}
+
+
 uint8_t get_receiveBufferOverflowDetected()
 {
 	return receiveBufferOverflowDetected;
+}
+
+void clear_receiveBufferOverflowDetected()
+{
+	receiveBufferOverflowDetected=0;
 }
