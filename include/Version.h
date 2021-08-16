@@ -10,7 +10,7 @@
 #ifndef VERSION_FILE_H
 #define VERSION_FILE_H
 
-#define SW_VERSION 19
+#define SW_VERSION 20
 #define RELEASE
 #ifndef RELEASE
 #warning This Version is for internal use only

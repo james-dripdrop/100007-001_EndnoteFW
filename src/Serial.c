@@ -426,9 +426,9 @@ unsigned char serial_Service(void)
 		switch (ucSstate)
 		{
 			case IDLE:
-				timer_SetTime(FTIMER_SERIAL_RECEIVE_TIMEOUT, SERIAL_RECEIVE_TIMEOUT_ms_x10);
 				if (ucReceivedChar == STX)
 				{
+					timer_SetTime(FTIMER_SERIAL_RECEIVE_TIMEOUT, SERIAL_RECEIVE_TIMEOUT_ms_x10);
 					ucCRC16DataCnt = 0;
 					ucSstate = TO_ADDR;
                 }
