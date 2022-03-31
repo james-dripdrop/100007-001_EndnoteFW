@@ -9,14 +9,10 @@
 
 #ifndef VERSION_FILE_H
 #define VERSION_FILE_H
-
-#define SW_VERSION 20
-#define RELEASE
-#ifndef RELEASE
+#ifdef RELEASE
+#define SW_VERSION 30
+#else 
 #warning This Version is for internal use only
 #define SW_VERSION 0
 #endif
-
-
-
 #endif /* VERSION_FILE_H */

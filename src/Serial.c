@@ -24,6 +24,7 @@
 #include "solenoid.h"
 #include "RFID.h"
 #include "Version.h"
+#include "CommonData.h"
 #include <avr/boot.h>
 #include <string.h>
 /***************************************************************************/
@@ -74,9 +75,7 @@ typedef enum {
 
 #define SERIAL_RECEIVE_TIMEOUT_ms_x10 10
 
-#define GREEN_LED_POS	0
-#define RED_LED_POS		1
-#define BLUE_LED_POS	2
+
 
 #define ATTEMPTS_TO_CATCH_ID 10000
 #define RETURN_DECAY 30 // this is the wheelspin delay counter (before reporting) on return
@@ -212,7 +211,13 @@ void decode_telegram(ToSatelliteTelegram_t tTelegramType, bool bBroadcast, uint8
 	switch (tTelegramType)
 	{
 		case TO_SATELLITE_TLG_LED:
-			LED_setColor(ucReceivedData[RED_LED_POS], ucReceivedData[GREEN_LED_POS], ucReceivedData[BLUE_LED_POS]);
+			if(ucDatacount != LED_REQ_LEN){
+				LED_setColor(0xFF,0x00,0x00); //red for error - we have some kind of mismatch in protocol
+			}
+			else{
+				LED_handleNewLEDMessage(ucReceivedData[LED_REQ_R1],ucReceivedData[LED_REQ_G1],ucReceivedData[LED_REQ_B1],ucReceivedData[LED_REQ_T1],ucReceivedData[LED_REQ_R2],ucReceivedData[LED_REQ_G2],ucReceivedData[LED_REQ_B2],ucReceivedData[LED_REQ_T2],ucReceivedData[LED_COLOR_SEQUENCE_DEFINITION]);	
+			}
+			
 			if (!bBroadcast) 
 			{
 				outTelegramType = TO_MASTER_TLG_LED;

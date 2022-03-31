@@ -54,11 +54,16 @@
 /*                                                                         */
 /***************************************************************************/
 
-void LED_init(void);
+void LED_init(unsigned char ledSequenceType);
 
 void LED_setColor(unsigned char ucRed, unsigned char ucGreen, unsigned char ucBlue);
 
 void LED_getColor(unsigned char* ucRed, unsigned char* ucGreen, unsigned char* ucBlue);
 
+void LED_handleNewLEDMessage(unsigned char r1, unsigned char g1, unsigned char b1, unsigned char t1, unsigned char r2, unsigned char g2, unsigned char b2, unsigned char t2, unsigned char seqType);
+
+void LED_turn_off_LED(void);
+
+void LED_handler(void);
 
 #endif /* _COMPILE_LED_H */

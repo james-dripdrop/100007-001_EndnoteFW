@@ -239,9 +239,9 @@ void NeoPixel_show(void) {
 
 #ifdef __AVR__
 // AVR MCUs -- ATmega & ATtiny (no XMEGA) ---------------------------------
-
-#define F_CPU 14300000UL //Actually 14745600 //8000000
-
+#ifndef F_CPU
+#define F_CPU 14745600UL //Actually 14745600 //8000000
+#endif
   volatile uint16_t
     i   = numBytes; // Loop counter
   volatile uint8_t
@@ -708,7 +708,7 @@ void NeoPixel_show(void) {
 #endif // NEO_KHZ400
 
 // 12 MHz(ish) AVR --------------------------------------------------------
-#elif (F_CPU >= 11100000UL) && (F_CPU <= 14300000UL)
+#elif (F_CPU >= 11100000UL) && (F_CPU <= 14745600UL)
 
 #ifdef NEO_KHZ400 // 800 KHz check needed only if 400 KHz support enabled
   if(is800KHz) {

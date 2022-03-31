@@ -68,7 +68,29 @@ typedef enum {
 #define ALL_ADDRESS				0x20
 #define SATELLITE_BASE_ADDRESS	0x30	// added to the DIP-SW setting on satellites, this will give the satellite address
 										// Note: Dip-SW setting 1 is satellite no 1 - referenced as 0 in SW due to array indexing
+// LED request message
 
+enum{
+	LED_REQ_R1 = 0x00,
+	LED_REQ_G1,
+	LED_REQ_B1,
+	LED_REQ_T1,
+	LED_REQ_R2,
+	LED_REQ_G2,
+	LED_REQ_B2,
+	LED_REQ_T2,
+	LED_COLOR_SEQUENCE_DEFINITION,
+	LED_REQ_LEN
+}; /**/
+
+enum {
+	LED_GRB_ORDER = 0x00,
+	LED_RGB_ORDER,
+	LED_GBR_ORDER,
+	LED_RBG_ORDER,
+	LED_BRG_ORDER,
+	LED_BGR_ORDER,
+};
 
 
 

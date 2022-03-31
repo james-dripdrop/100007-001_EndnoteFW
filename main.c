@@ -4,6 +4,7 @@
 #include "solenoid.h"
 #include "RFID.h"
 #include "timer.h"
+#include "NeoPixel.h"
 
 
 #include "avr\io.h"
@@ -40,7 +41,7 @@ int main(void)
 	/* Initializes MCU, drivers and middleware */
 	atmel_start_init();
 
-	LED_init();
+	LED_init(NEO_GRB); // we start with assumption that it is RGB (as this is apparently the current batch)
 	RFID_Init();
 	
 	LED_setColor(0x00,0x00,0x21); // Signal "initialized and ready"
@@ -51,6 +52,7 @@ int main(void)
 		connectionEstablished = serial_Service();
 		solenoid_Service();
 		RFID_service();
+		LED_handler();
 		//providing color shift to show end note is functional prior to connection (can also be used as part of factory test verification)
 		if (connectionEstablished == 0){
 			if(!timer_bRunning(FTIMER_COLORSHIFT)){
