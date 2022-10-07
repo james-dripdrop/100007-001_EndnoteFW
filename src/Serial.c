@@ -112,6 +112,7 @@ volatile uint32_t ulUmbrellaID = 0;
 bool bUmbrellaRemoved = false;
 bool bUmbrellaReleaseTimeout = false;
 bool statusConfirmationReceived = true; //default to true will send the first response
+bool quietMode = false;
 
 uint16_t uiCatchReturnedID = 0;
 uint16_t uiCatchReleasedID = 0;
@@ -146,15 +147,17 @@ void SendArray(unsigned char *ucData, unsigned char ucNoOfData)
 	unsigned int uiCRC = 0;
 	
 	uiCRC = crc_16(ucData, (size_t)ucNoOfData);
-	
-	if (RS485_DIR_get_level() !=  RS485TX){
-				//we need to swap the port direction
-				//give some variability by address to assist in preventing bus conflict
-		volatile uint16_t decon_delay = SATELLITE_ADDRESS*5; //in the range of 0x30-0x3F * 5
-		while(decon_delay--){}
-		RS485_DIR_set_level(RS485TX);
+	if (!quietMode){
+		// we don't want to actually set the RS485 tranceiver to transmit in quiet mode, so we block the transition here
+		// note: this will fail on a electronic design that has tranceiver line autodetection or will select transmit when dataline has traffic 
+		if (RS485_DIR_get_level() !=  RS485TX){
+					//we need to swap the port direction
+					//give some variability by address to assist in preventing bus conflict
+			volatile uint16_t decon_delay = SATELLITE_ADDRESS*5; //in the range of 0x30-0x3F * 5
+			while(decon_delay--){}
+			RS485_DIR_set_level(RS485TX);
+		}
 	}
-
 	USART_0_write(STX);
 	while (ucDataCnt < ucNoOfData)
 	{
@@ -212,7 +215,7 @@ void decode_telegram(ToSatelliteTelegram_t tTelegramType, bool bBroadcast, uint8
 	{
 		case TO_SATELLITE_TLG_LED:
 			if(ucDatacount != LED_REQ_LEN){
-				LED_setColor(0xFF,0x00,0x00); //red for error - we have some kind of mismatch in protocol
+				LED_setColor(ERROR_LED_R,ERROR_LED_G,ERROR_LED_B); //red for error - we have some kind of mismatch in protocol
 			}
 			else{
 				LED_handleNewLEDMessage(ucReceivedData[LED_REQ_R1],ucReceivedData[LED_REQ_G1],ucReceivedData[LED_REQ_B1],ucReceivedData[LED_REQ_T1],ucReceivedData[LED_REQ_R2],ucReceivedData[LED_REQ_G2],ucReceivedData[LED_REQ_B2],ucReceivedData[LED_REQ_T2],ucReceivedData[LED_COLOR_SEQUENCE_DEFINITION]);	
@@ -239,8 +242,21 @@ void decode_telegram(ToSatelliteTelegram_t tTelegramType, bool bBroadcast, uint8
 			outTelegramType = TO_MASTER_TLG_END_NODE_STATUS;
 			break;
 		case TO_SATELLITE_TLG_RESET:
-			LED_setColor(0,0,0x0A);
+			LED_setColor(RESET_LED_R,RESET_LED_G,RESET_LED_B);
 			while (true) {};
+			break;
+		case TO_SATELLITE_TLG_QUIET_MODE:
+			// this indicates that the endnote should NOT attempt to get control of RS485 bus (likely due to master loading a particular endnote)
+			// expect that only way to exit is via RESET command
+			LED_setColor(QUIET_LED_R,QUIET_LED_G,QUIET_LED_B);
+			quietMode = true;
+			break;
+		case TO_SATELLITE_TLG_ENTER_BOOTLOADER:
+			LED_setColor(BLOAD_LED_R,BLOAD_LED_G,BLOAD_LED_B);
+			FLASH_0_write_eeprom_byte((eeprom_adr_t) BOOTLOADER_EEPROM_FLAG_ADDRESS, ENTER_BOOT_MODE_PATTERN);
+			FLASH_0_write_eeprom_byte((eeprom_adr_t) BOOTLOADER_EEPROM_LOADATTEMPTS_ADDRESS, 0xFF);
+			/* so - watchdog reset does not apparently go back into the bootloader - so we need to point to the bootloader directly*/
+			jump_to_bootloader();
 			break;
 		default:
 			// currently ignore error and continue (non-critical fault)
@@ -258,6 +274,9 @@ void decode_telegram(ToSatelliteTelegram_t tTelegramType, bool bBroadcast, uint8
 /* Interface                                                               */
 /*                                                                         */
 /***************************************************************************/
+void jump_to_bootloader(void){
+	((void (*)())BOOTLOADER_FLASH_START_ADDRESS)();
+}
 
 /************************************************************************/
 /* Send a telegram                                                        */
@@ -475,16 +494,24 @@ unsigned char serial_Service(void)
 			case TELEGRAM_TYPE:
 				ucDataForCRC16[ucCRC16DataCnt++] = ucReceivedChar;
 	            tReceivedTelegramType = (ToSatelliteTelegram_t)ucReceivedChar;
-				if ((tReceivedTelegramType > TO_SATELLITE_NO_TLG) && (tReceivedTelegramType <= TO_SATELLITE_TLG_RESET)) // only accept valid telegram types
-				{
-			        ucSstate = LENGTH;
+				
+				// only accept valid telegram types
+				switch(tReceivedTelegramType){
+					case TO_SATELLITE_TLG_LED:				
+					case TO_SATELLITE_TLG_RELEASE:	
+					case TO_SATELLITE_TLG_VERSION:	
+					case TO_SATELLITE_TLG_STATUS:	
+					case TO_SATELLITE_TLG_RESET:	
+					case TO_SATELLITE_TLG_QUIET_MODE:
+					case TO_SATELLITE_TLG_ENTER_BOOTLOADER:
+						ucSstate = LENGTH;
+						break;
+					default:
+						ucSstate = IDLE;
+						discardedBytes += 1;
+						break;
 				}
-				else
-				{
-					ucSstate = IDLE;
-					discardedBytes += 1;
-
-				}
+	
 			    break;
 			case LENGTH:
 				ucDataForCRC16[ucCRC16DataCnt++] = ucReceivedChar;

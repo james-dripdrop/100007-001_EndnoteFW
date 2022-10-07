@@ -16,7 +16,7 @@ FUSES =
 	// For manual setting, see /* Fuses */ paragraph in the bottom of iom328.pb.h
 	//.low = 0xE2, 8MHz internal
 	.low = 0xFF, // >8MHz ext x-tal
-	.high = 0xCF,
+	.high = 0xD0,
 	.extended = 0xF7, 
 };
 
@@ -32,6 +32,22 @@ void main_inc_ucTimerTic_10ms(void)
 
 
 
+void check_boot_conditions(){
+		uint8_t checkBootConditions = 0;
+		checkBootConditions =  FLASH_0_read_eeprom_byte(BOOTLOADER_EEPROM_FLAG_ADDRESS);
+		if (!((checkBootConditions == APPLICATION_AOK_PATTERN) || (checkBootConditions == ATTEMPT_TO_EXECUTE_PATTERN)))
+		{
+			jump_to_bootloader();
+		}
+		checkBootConditions =  FLASH_0_read_eeprom_byte(BOOTLOADER_EEPROM_LOADATTEMPTS_ADDRESS);
+		if (checkBootConditions > MAX_LOAD_ATTEMPTS){
+			jump_to_bootloader();
+		}
+		//clear # of load attempts for this application in EEPROM
+		FLASH_0_write_eeprom_byte((eeprom_adr_t) BOOTLOADER_EEPROM_LOADATTEMPTS_ADDRESS, 0);
+		//set that application loaded successfully
+		FLASH_0_write_eeprom_byte((eeprom_adr_t) BOOTLOADER_EEPROM_FLAG_ADDRESS, APPLICATION_AOK_PATTERN);
+}
 
 int main(void)
 {
@@ -44,8 +60,11 @@ int main(void)
 	LED_init(NEO_GRB); // we start with assumption that it is RGB (as this is apparently the current batch)
 	RFID_Init();
 	
-	LED_setColor(0x00,0x00,0x21); // Signal "initialized and ready"
-	timer_SetTime(FTIMER_COLORSHIFT,3); 
+	LED_setColor(INIT_LED_R,INIT_LED_G,INIT_LED_B); // Signal "initialized and ready"
+	timer_SetTime(FTIMER_COLORSHIFT,3);
+	//we should check to see if we should be entering the bootloader, or 
+	check_boot_conditions(); //note: this makes devices without bootloaders simply break.
+	 
 
 	while (1)
 	{
@@ -58,7 +77,7 @@ int main(void)
 			if(!timer_bRunning(FTIMER_COLORSHIFT)){
 				unsigned char ucRed, ucGreen, ucBlue;
 				LED_getColor(&ucRed, &ucGreen, &ucBlue);
-				if (ucBlue > 0x21){
+				if (ucBlue > INIT_LED_B){
 					direction = -1;
 				}
 				else if (ucBlue == 0){

@@ -40,6 +40,14 @@
 extern "C" {
 #endif
 
+#define BOOTLOADER_EEPROM_FLAG_ADDRESS 0x00
+#define BOOTLOADER_EEPROM_LOADATTEMPTS_ADDRESS 0x01
+#define MAX_LOAD_ATTEMPTS 10
+#define ENTER_BOOT_MODE_PATTERN 0x00
+#define ATTEMPT_TO_EXECUTE_PATTERN 0xAE
+#define APPLICATION_AOK_PATTERN 0xAA
+
+
 /** Datatype for flash address */
 typedef uint16_t flash_adr_t;
 

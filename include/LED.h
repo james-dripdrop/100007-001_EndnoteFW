@@ -47,6 +47,30 @@
 /* or when code size must be kept at minimum.                              */
 /*                                                                         */
 /***************************************************************************/
+// reset - bright yellow
+#define RESET_LED_R 0xFF
+#define RESET_LED_G 0xFF
+#define RESET_LED_B 0x00
+// init - dark blue - will be pulsing prior to RS485 connection
+#define INIT_LED_R 0x00
+#define INIT_LED_G 0x00
+#define INIT_LED_B 0x21
+// quiet mode: orange
+#define QUIET_LED_R 0xFF
+#define QUIET_LED_G 0x89
+#define QUIET_LED_B 0x00
+// error - bright red
+#define ERROR_LED_R 0xFF
+#define ERROR_LED_G 0x00
+#define ERROR_LED_B 0x00
+// goto bootloader - bright blue
+#define BLOAD_LED_R 0x00
+#define BLOAD_LED_G 0xFF
+#define BLOAD_LED_B 0xFF
+
+
+
+
 
 /***************************************************************************/
 /*                                                                         */

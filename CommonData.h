@@ -37,6 +37,7 @@ typedef enum {
 } ToMasterTelegram_t;
 
 
+//comms are filtered to reject/ignore invalid telegrams - remember to update TELEGRAM_TYPE handling when adding messages
 typedef enum {
 	TO_SATELLITE_NO_TLG					= 0x00,
 	TO_SATELLITE_TLG_LED				= 0x01,
@@ -44,6 +45,9 @@ typedef enum {
 	TO_SATELLITE_TLG_VERSION			= 0x03,
 	TO_SATELLITE_TLG_STATUS				= 0x04,
 	TO_SATELLITE_TLG_RESET				= 0x55,
+	TO_SATELLITE_TLG_QUIET_MODE			= 0x90,
+	TO_SATELLITE_TLG_ENTER_BOOTLOADER	= 0xEB,
+	
 } ToSatelliteTelegram_t;
 
 
@@ -54,7 +58,7 @@ typedef enum {
 /*                                                                         */
 /***************************************************************************/
 
-
+#define BOOTLOADER_FLASH_START_ADDRESS 0x7000
 //#define MAX_NO_OF_UMBRELLAS_IN_SATELLITE	5 /* 10 in spec, but limited due to RAM usage and communication speed (5 ID's is max throughput at 38.400Baud - 1,04ms / umbrella (4bytes)) */
 
 #define UMBRELLA_ID_LENGTH_bytes			4 /* IDs from umbrellas are always 4 bytes long. */
