@@ -575,7 +575,7 @@ void serial_UmbrellaReturned(void)
 {
 	bUmbrellaReturned = true;
 	TimerStop(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT);
-	timer_SetTime(MTIMER_STATUS_HOLD_RETURN_TIMEOUT,3); //set status hold for 300ms; the intent is to delay reporting a return by this time to allow an RFID to be captured.
+	timer_SetTime(MTIMER_STATUS_HOLD_RETURN_TIMEOUT,6); //set status hold for 600ms; the intent is to delay reporting a return by this time to allow an RFID to be captured.
 
 
 }
@@ -584,7 +584,8 @@ void serial_UmbrellaReleased(void)
 {
 	bUmbrellaRemoved = true;
 	TimerStop(MTIMER_STATUS_HOLD_RETURN_TIMEOUT);
-	timer_SetTime(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT,3); //set status hold for 300ms; the intent is to delay reporting a release by this time to allow an RFID to be captured.
+	TimerStop(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT); // so, in release we want to get the ID out as quickly as possible, as we likely have ALREADY read the umbrella to be removed
+	//timer_SetTime(MTIMER_STATUS_HOLD_RELEASE_TIMEOUT,2); //set status hold for 100ms; the intent is to delay reporting a release by this time to allow an RFID to be captured.
 }
 
 void serial_UmbrellaReleaseTimout(void)

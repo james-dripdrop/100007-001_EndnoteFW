@@ -213,7 +213,7 @@ void wheel_DetectMove(void)
 			request the RFID read
 			clear the spin timer
 			*/
-			RFID_RequestIDRead(); //JGU: interrupt driven clearing of RFID read timer
+			//RFID_RequestIDRead(); //JGU: interrupt driven clearing of RFID read timer -- JGU: as the RFID is polled frequently, we've likely already read the tag- get it out as quick as possible.
 			serial_UmbrellaReleased();
 			TimerStop(MTIMER_SPIN_TIMEOUT);
 			// locking the arm probably should be in its own function			

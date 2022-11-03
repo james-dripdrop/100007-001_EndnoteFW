@@ -204,6 +204,9 @@ void LED_handler(void){
 					if(stored_t2 != LED_NOTIMEOUT){
 						colorTimerIsUsed = LED_COLOR_TIMER_USED;
 						timer_SetTime(MTIMER_LED_COLOR_CHANGE,stored_t2);
+					}
+					else{
+						colorTimerIsUsed = LED_COLOR_TIMER_NOT_USED; // color1 timed out, now move to color 2 without timing out.					
 					}					
 				}
 				else{
